@@ -9,7 +9,7 @@ I was very tired of all the boilerplating, and typecasting and runtime crashes w
 - Need very simple mechanism for converting to and from JSON strings/byte stream
 - Concise and simple syntax to traverse the JSON objects and get data out of them (or to modify them)
 - Should not ever crash, even if keys don't exist, or type of data does not match
-- Should to type conversion automatically, if possible when accessing data 
+- Should do type conversion automatically, if possible when accessing data 
 
 So, I build my solution based on these principle and have been using it in production for over a year, and it made my life quite a bit easier. So, I'm sharing it now for others who want simple reliable handling for JSON.
 
