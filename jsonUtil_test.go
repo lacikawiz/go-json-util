@@ -1,7 +1,6 @@
 package jsonutil
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -70,37 +69,6 @@ func TestEncode(t *testing.T) {
 		t.Log("Should have:", testStr)
 		t.Log("Got", res)
 	}
-}
-
-func TestQueryString(t *testing.T) {
-	t1 := FromJSON([]byte(`{"x#":{
-		"a":2,"b":"str","c!":[1,2,"3"]
-	}}`))
-	res := t1.ToQueryString()
-	//the sequence is random so we need to test it this way
-	if !(strings.Contains(res, "x%23[c%21][]=1") &&
-		strings.Contains(res, "x%23[c%21][]=2") &&
-		strings.Contains(res, "x%23[c%21][]=3") &&
-		strings.Contains(res, "x%23[a]=2") &&
-		strings.Contains(res, "x%23[b]=str") &&
-		len(res) == 66) {
-		t.Error("Query building test failed")
-	}
-
-	t2 := Load(map[string]interface{}{
-		"filter": map[string]interface{}{"EMAIL": "laszlo@laszlo.com"},
-		"select": []interface{}{"EMAIL", "*", "PHONE"},
-	})
-	res = t2.ToQueryString()
-	if !(strings.Contains(res, "filter[EMAIL]=laszlo@laszlo.com") &&
-		strings.Contains(res, "select[]=EMAIL") &&
-		strings.Contains(res, "select[]=%2A") &&
-		strings.Contains(res, "select[]=PHONE") &&
-		len(res) == 74) {
-		t.Error("Query building from literal failed")
-		t.Log(res)
-	}
-
 }
 
 func TestAddKV(t *testing.T) {

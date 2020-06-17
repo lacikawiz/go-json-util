@@ -4,12 +4,11 @@ package jsonutil
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"runtime/debug"
 	"strconv"
 	"strings"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 //RawObj Type alias for the Go representation of a JSON object
@@ -135,7 +134,7 @@ func (o Obj) String() (s string) {
 			s = "false"
 		}
 	default:
-		s = spew.Sdump(o.Data) //generate a full printout
+		s = fmt.Sprintf("%+v", o.Data) //generate a full printout
 	}
 	return s
 }
