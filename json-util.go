@@ -19,9 +19,9 @@ type RawArray = []interface{}
 
 //Obj : the basic JSON wrapper object
 type Obj struct {
-	// root interface{}
-	Data interface{}
-	Err  error
+	Data    interface{}
+	Err     error
+	updater func(interface{}) //function with closure to update the value without breaking references
 }
 
 //DBG variable to control the level of debug logging
@@ -30,7 +30,34 @@ var DBG struct {
 	ShowWarnings bool
 }
 
-//Load create the chainable object from
+/*████████████████████████████████████████████
+██████ HELPER FUNCTIONS
+████████████████████████████████████████████*/
+
+//recovery: Internal function to run the repeating code for handling cases when things would panic
+func recovery(warn string, setter func(error)) {
+	if r := recover(); r != nil {
+		setter(r.(error))
+		if DBG.ShowWarnings {
+			log.Println(warn, r)
+		}
+		if DBG.PrintDetail {
+			debug.PrintStack()
+		}
+	}
+}
+
+func setError(to *error, newErr error) {
+	if to != nil {
+		*to = newErr
+	}
+}
+
+/*████████████████████████████████████████████
+██████ JSON CONVERSIONS + CONSTRUCTORS
+████████████████████████████████████████████*/
+
+//Load creates the chainable object from the variable passed to it
 func Load(obj interface{}) Obj {
 	if obj == nil {
 		if DBG.ShowWarnings {
@@ -45,116 +72,91 @@ func Load(obj interface{}) Obj {
 }
 
 //FromJSON creates a JSON representation from a byte slice
-func FromJSON(jsonInp []byte) (out Obj) {
+func FromJSON(jsonInp string) (out Obj) {
 	out = Obj{}
 
-	if err := json.Unmarshal(jsonInp, &out.Data); err != nil {
+	if err := json.Unmarshal([]byte(jsonInp), &out.Data); err != nil {
 		out.Err = err
 	}
 	return
 }
 
-//IsNil : checks if the raw data is a `nil`
-func (o Obj) IsNil() bool { return o.Data == nil }
+//ToJSON GENERATES THE JSON STRING REPRESENTATION OF THE OBJECT
+func (o Obj) ToJSON() string {
 
-//Raw : this is for testing purposes only, returns the raw data object
-func (o Obj) Raw() interface{} { return o.Data }
+	out, err := json.Marshal(o.Data)
+	if err != nil {
+		return "ERROR"
+	}
+	return string(out)
+}
+
+/*████████████████████████████████████████████
+██████ WALK METHODS, to access nested, indexed content
+████████████████████████████████████████████*/
 
 //K : walk one, or more steps deeper into the structure  K=key
 func (o Obj) K(keys ...string) (n Obj) {
-	defer func() {
-		if r := recover(); r != nil {
-			n = Obj{Err: r.(error)}
-			if DBG.ShowWarnings {
-				log.Println("JSON walk error", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
+	defer recovery("JSON walk error", func(err error) {
+		n = Obj{Err: err}
+	})
 
+	o.Err = nil
 	n = Obj{Data: o.Data}
 
 	for _, idx := range keys {
+		encaps := n.Data.(RawObj)
+		n.updater = func(val interface{}) {
+			encaps[idx] = val
+		}
 		n.Data = n.Data.(RawObj)[idx]
 	}
 	return n
 }
 
-//I : walk one, or more dimension down into the array
+//I : walk one, or more dimension down into an array
 func (o Obj) I(index ...int) (n Obj) {
-	defer func() {
-		if r := recover(); r != nil {
-			n = Obj{Err: r.(error)}
-			if DBG.ShowWarnings {
-				log.Println("JSON walk error", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
+	defer recovery("JSON walk error", func(err error) {
+		n = Obj{Err: err}
+	})
 
+	o.Err = nil
 	n = Obj{Data: o.Data}
 
 	for _, idx := range index {
+		n.updater = func(val interface{}) {
+			n.Data.(RawArray)[idx] = val
+		}
 		n.Data = n.Data.(RawArray)[idx]
 	}
 	return n
 }
 
-//String : convert value to a string
-func (o Obj) String() (s string) {
-	defer func() {
-		if r := recover(); r != nil {
-			s = ""
-			if DBG.ShowWarnings {
-				log.Println("JSON to string conversion error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
+/*████████████████████████████████████████████
+██████ CONVERSION METHODS
+████████████████████████████████████████████*/
 
-	s = ""
+//String : convert value to a string
+func (o Obj) String(toErr *error) (s string) {
+	setError(toErr, nil)
+	defer recovery("JSON to string conversion error:", func(err error) {
+		setError(toErr, err)
+	})
+
 	if o.Data == nil {
-		return s
+		setError(toErr, errors.New(" `nil` to string conversion"))
+		return ""
 	}
-	switch v := o.Data.(type) {
-	case float64:
-		s = strconv.FormatFloat(v, 'f', -1, 64)
-	case string:
-		s = v
-	case bool:
-		if v {
-			s = "true"
-		} else {
-			s = "false"
-		}
-	default:
-		s = fmt.Sprintf("%+v", o.Data) //generate a full printout
-	}
-	return s
+	return fmt.Sprintf("%+v", o.Data) //use fmt's conversion for pretty much any type
 }
 
 //Int64 converts value to an Int64
-func (o Obj) Int64() (i int64) {
-	defer func() {
-		if r := recover(); r != nil {
-			i = 0
-			if DBG.ShowWarnings {
-				log.Println("JSON to Int64 conversion error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
+func (o Obj) Int64(toErr *error) (i int64) {
+	setError(toErr, nil)
+	defer recovery("JSON to int conversion error:", func(err error) {
+		setError(toErr, err)
+	})
 
-		}
-	}()
-	o.Err = nil
-	i = 0
 	switch v := o.Data.(type) {
 	case float64:
 		i = int64(v)
@@ -175,7 +177,7 @@ func (o Obj) Int64() (i int64) {
 	case string:
 		x, err := strconv.ParseInt(v, 10, 32)
 		if err != nil {
-			o.Err = errors.New(err.Error())
+			setError(toErr, err)
 		}
 		i = int64(x)
 	default:
@@ -185,26 +187,17 @@ func (o Obj) Int64() (i int64) {
 }
 
 //Int converts value to an Int
-func (o Obj) Int() (i int) {
-	return int(o.Int64())
+func (o Obj) Int(toErr *error) (i int) {
+	return int(o.Int64(toErr))
 }
 
 //Float64 converts value to an Float64
-func (o Obj) Float64() (f float64) {
-	defer func() {
-		if r := recover(); r != nil {
-			f = 0
-			if DBG.ShowWarnings {
-				log.Println("JSON to Float64 conversion error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
+func (o Obj) Float64(toErr *error) (f float64) {
+	setError(toErr, nil)
+	defer recovery("JSON to Float64 conversion error:", func(err error) {
+		setError(toErr, err)
+	})
 
-		}
-	}()
-	o.Err = nil
-	f = 0
 	switch v := o.Data.(type) {
 	case float64:
 		f = float64(v)
@@ -225,7 +218,7 @@ func (o Obj) Float64() (f float64) {
 	case string:
 		x, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			o.Err = errors.New(err.Error())
+			setError(toErr, err)
 		}
 		f = float64(x)
 	default:
@@ -235,24 +228,17 @@ func (o Obj) Float64() (f float64) {
 }
 
 //Float32 converts value to an Float32
-func (o Obj) Float32() float32 {
-	return float32(o.Float64())
+func (o Obj) Float32(toErr *error) float32 {
+	return float32(o.Float64(toErr))
 }
 
-//Bool converts value to an Bool
-func (o Obj) Bool() (b bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			b = false
-			if DBG.ShowWarnings {
-				log.Println("JSON to Bool conversion error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
-	b = false
+//Bool converts value to a Bool
+func (o Obj) Bool(toErr *error) (b bool) {
+	setError(toErr, nil)
+	defer recovery("JSON to Bool conversion error:", func(err error) {
+		setError(toErr, err)
+	})
+
 	if o.Data == nil {
 		return b
 	}
@@ -268,69 +254,117 @@ func (o Obj) Bool() (b bool) {
 		if v == "false" || v == "no" {
 			return false
 		}
-		b = o.Data.(bool) //generate an error
+		setError(toErr, errors.New("can't convert value to Bool"))
 	default:
-		b = o.Data.(bool) //generate an error
+		setError(toErr, errors.New("can't convert value to Bool"))
 	}
 	return b
 }
 
+//ToStringArray converts the array in the object to a []string type
+func (o Obj) ToStringArray(toErr *error) (out []string) {
+	setError(toErr, nil)
+	defer recovery("ToStringArray error:", func(err error) {
+		setError(toErr, err)
+	})
+
+	out = []string{}
+	out = make([]string, len(o.Data.([]interface{})))
+	i := 0
+	*toErr = o.ForEachArr(func(val Obj, _ int) {
+		out[i] = val.String(nil)
+		i++
+	})
+
+	return out
+}
+
+/*████████████████████████████████████████████
+██████ ITERATORS
+████████████████████████████████████████████*/
+
 //ForEachArr ITERATE OVER AN ARRAY
-func (o Obj) ForEachArr(F func(Obj, int)) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("ARRAY iteration error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
+func (o Obj) ForEachArr(F func(Obj, int)) (toErr error) {
+	defer recovery("ARRAY iteration error:", func(err error) {
+		toErr = err
+	})
 
 	if o.Data == nil {
-		return
+		return nil
 	}
 	it := o.Data.(RawArray) //it will throw an error automatically if it's not the correct type
 	for idx, val := range it {
-		F(Obj{Data: val}, idx)
+		F(Obj{Data: val,
+			updater: func(newVal interface{}) {
+				it[idx] = newVal
+			}}, idx)
 	}
-}
-
-//Push adds an object to an array
-func (o *Obj) Push(value interface{}) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("Not an array was used in Push operation:", r)
-			}
-		}
-	}()
-
-	o.Data = append(o.Data.(RawArray), value)
+	return nil
 }
 
 //ForEachObj ITERATE OVER AN OBJECT
-func (o Obj) ForEachObj(F func(Obj, string)) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("OBJECT iteration error:", r)
-			}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
+func (o Obj) ForEachObj(F func(Obj, string)) (toErr error) {
+	defer recovery("OBJECT iteration error:", func(err error) {
+		toErr = err
+	})
 
 	if o.Data == nil {
-		return
+		return nil
 	}
 	it := o.Data.(RawObj) //it will throw an error automatically if it's not the correct type
 	for idx, val := range it {
-		F(Obj{Data: val}, idx)
+		F(Obj{Data: val,
+			updater: func(newVal interface{}) {
+				it[idx] = newVal
+			}}, idx)
+	}
+	return nil
+}
+
+/*████████████████████████████████████████████
+██████ MODIFIER METHODS
+████████████████████████████████████████████*/
+
+//Push adds an object to an array
+func (o *Obj) Push(value interface{}) {
+	defer recovery("Push error:", func(err error) {
+		o.Err = err
+	})
+
+	o.Err = nil
+	o.Data = append(o.Data.(RawArray), value)
+	if o.updater != nil {
+		o.updater(o.Data)
 	}
 }
+
+// AddKV adds a key/value pair to the JSON object
+func (o *Obj) AddKV(key string, value interface{}) {
+	defer recovery("AddKV error:", func(err error) {
+		o.Err = err
+	})
+
+	o.Err = nil
+
+	o.Data.(RawObj)[key] = value
+}
+
+// RemoveKey removes a key from a JSON object
+func (o Obj) RemoveKey(key string) (n Obj) {
+	defer recovery("RemoveKey error:", func(err error) {
+		n = Obj{Err: err}
+	})
+
+	o.Err = nil
+
+	delete(o.Data.(RawObj), key)
+
+	return o
+}
+
+/*████████████████████████████████████████████
+██████ INFO METHODS
+████████████████████████████████████████████*/
 
 // Len : The length (size of an array or object)
 // if the object is no an array or object then result is -1
@@ -344,73 +378,8 @@ func (o Obj) Len() int {
 	return -1
 }
 
-//ToJSON GENERATES THE JSON STRING REPRESENTATION OF THE OBJECT
-func (o Obj) ToJSON() string {
+//IsNil : checks if the raw data is a `nil`
+func (o Obj) IsNil() bool { return o.Data == nil }
 
-	out, err := json.Marshal(o.Data)
-	if err != nil {
-		return "ERROR"
-	}
-	return string(out)
-}
-
-// AddKV adds a key/value pair to the JSON object
-func (o Obj) AddKV(key string, value interface{}) (n Obj) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("OBJECT iteration error:", r)
-			}
-			n = Obj{Err: r.(error)}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
-
-	o.Data.(RawObj)[key] = value
-	return o
-}
-
-// RemoveKey removes a key from a JSON object
-func (o Obj) RemoveKey(key string) (n Obj) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("RemoveKey error:", r)
-			}
-			n = Obj{Err: r.(error)}
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
-
-	delete(o.Data.(RawObj), key)
-
-	return o
-}
-
-//ToStringArray converts the array in the object to a []string type
-func (o Obj) ToStringArray() (out []string) {
-	defer func() {
-		if r := recover(); r != nil {
-			if DBG.ShowWarnings {
-				log.Println("RemoveKey error:", r)
-			}
-			out = []string{}
-			o.Err = r.(error)
-			if DBG.PrintDetail {
-				debug.PrintStack()
-			}
-		}
-	}()
-
-	x1 := o.Data.([]interface{})
-
-	out = make([]string, len(x1))
-	for i := range x1 {
-		out[i] = x1[i].(string)
-	}
-	return out
-}
+//Raw : this is for testing purposes only, returns the raw data object
+func (o Obj) Raw() interface{} { return o.Data }
