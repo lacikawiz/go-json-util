@@ -1,7 +1,5 @@
 module json-util-examples
 
-require (
-  github.com/lacikawiz/go-json-util v0.0.0-20200617151926-5e8b6184f342
-)
+require github.com/lacikawiz/go-json-util v0.3.0
 
 go 1.12
