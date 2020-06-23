@@ -51,12 +51,50 @@ To can configure the verbosity by setting the `DBG` variable in the module:
 
 ## Examples
 
+```golang
+  import (
+    "fmt"
 
+    J "github.com/lacikawiz/go-json-util"
+  )
 
+	t1 := J.FromJSON(`[{"x":1},{"z":"str"},{"y":true}]`)
+	//converting an object or Map to String produces a concise printout of the contents
+	fmt.Println("Content of t1:", t1.String(nil)) //nil means we don't need error handling
+
+	//accessing the value of t1[0]["x"] converted to Int
+	{
+		t2 := t1.I(0).K("x").Int(nil) //nil means we don't care about error handling
+		fmt.Println("t2 = t1[0]['x'] : ", t2)
+	}
+
+	//accessing a non-existent key
+	{
+		var err error
+
+		t3 := t1.I(0).K("a").Int(&err)
+
+		fmt.Println("t3 = t1[0]['a'] : ", t3, "error=", err)
+	}
+```
 
 
 # Reference
 
+
+---
+
+### module variables
+
+```go
+var DBG struct {
+	PrintDetail  bool
+	ShowWarnings bool
+}
+```
+DBG variable to control the level of debug logging
+
+---
 
 ### type Obj
 
@@ -67,7 +105,9 @@ type Obj struct {
 }
 ```
 
-Obj : the basic JSON wrapper object
+Obj is the basic JSON wrapper object
+
+---
 
 ### func  FromJSON
 
@@ -76,6 +116,8 @@ func FromJSON(jsonInp string) (out Obj)
 ```
 FromJSON creates a JSON representation from a byte slice
 
+---
+
 ### func  Load
 
 ```go
@@ -83,12 +125,8 @@ func Load(obj interface{}) Obj
 ```
 Load creates the chainable object from the variable passed to it
 
-### func (*Obj) AddKV
+---
 
-```go
-func (o *Obj) AddKV(key string, value interface{})
-```
-AddKV adds a key/value pair to the JSON object
 
 ### func (Obj) Bool
 
@@ -97,12 +135,16 @@ func (o Obj) Bool(toErr *error) (b bool)
 ```
 Bool converts value to a Bool
 
+---
+
 ### func (Obj) Float32
 
 ```go
 func (o Obj) Float32(toErr *error) float32
 ```
 Float32 converts value to an Float32
+
+---
 
 ### func (Obj) Float64
 
@@ -111,26 +153,34 @@ func (o Obj) Float64(toErr *error) (f float64)
 ```
 Float64 converts value to an Float64
 
+---
+
 ### func (Obj) ForEachArr
 
 ```go
 func (o Obj) ForEachArr(F func(Obj, int)) (toErr error)
 ```
-ForEachArr ITERATE OVER AN ARRAY
+ForEachArr iterate over an array, calling a function with the values
+
+---
 
 ### func (Obj) ForEachObj
 
 ```go
 func (o Obj) ForEachObj(F func(Obj, string)) (toErr error)
 ```
-ForEachObj ITERATE OVER AN OBJECT
+ForEachObj iterate over an object, calling a function with the values
+
+---
 
 ### func (Obj) I
 
 ```go
 func (o Obj) I(index ...int) (n Obj)
 ```
-I : walk one, or more dimension down into an array
+I = walk one, or more dimension down into an array (I = index)
+
+---
 
 ### func (Obj) Int
 
@@ -139,6 +189,8 @@ func (o Obj) Int(toErr *error) (i int)
 ```
 Int converts value to an Int
 
+---
+
 ### func (Obj) Int64
 
 ```go
@@ -146,27 +198,35 @@ func (o Obj) Int64(toErr *error) (i int64)
 ```
 Int64 converts value to an Int64
 
+---
+
 ### func (Obj) IsNil
 
 ```go
 func (o Obj) IsNil() bool
 ```
-IsNil : checks if the raw data is a `nil`
+IsNil checks if the raw data is a `nil`
+
+---
 
 ### func (Obj) K
 
 ```go
 func (o Obj) K(keys ...string) (n Obj)
 ```
-K : walk one, or more steps deeper into the structure K=key
+K walk one, or more steps deeper into the structure K=key
+
+---
 
 ### func (Obj) Len
 
 ```go
 func (o Obj) Len() int
 ```
-Len : The length (size of an array or object) if the object is no an array or
-object then result is -1
+Len gives the length (size of an array or object) if the object is no an array
+or object then result is -1
+
+---
 
 ### func (*Obj) Push
 
@@ -175,12 +235,16 @@ func (o *Obj) Push(value interface{})
 ```
 Push adds an object to an array
 
+---
+
 ### func (Obj) Raw
 
 ```go
 func (o Obj) Raw() interface{}
 ```
-Raw : this is for testing purposes only, returns the raw data object
+Raw returns the raw Golang interface object for the JSON object
+
+---
 
 ### func (Obj) RemoveKey
 
@@ -189,19 +253,25 @@ func (o Obj) RemoveKey(key string) (n Obj)
 ```
 RemoveKey removes a key from a JSON object
 
+---
+
 ### func (Obj) String
 
 ```go
 func (o Obj) String(toErr *error) (s string)
 ```
-String : convert value to a string
+String convert value to a string
+
+---
 
 ### func (Obj) ToJSON
 
 ```go
 func (o Obj) ToJSON() string
 ```
-ToJSON GENERATES THE JSON STRING REPRESENTATION OF THE OBJECT
+ToJSON generates the json string representation of the object
+
+---
 
 ### func (Obj) ToStringArray
 
@@ -209,6 +279,8 @@ ToJSON GENERATES THE JSON STRING REPRESENTATION OF THE OBJECT
 func (o Obj) ToStringArray(toErr *error) (out []string)
 ```
 ToStringArray converts the array in the object to a []string type
+
+---
 
 ### type RawArray
 
@@ -218,6 +290,8 @@ type RawArray = []interface{}
 
 RawArray Type alias for the Go representation of a JSON array
 
+---
+
 ### type RawObj
 
 ```go
@@ -225,3 +299,13 @@ type RawObj = map[string]interface{}
 ```
 
 RawObj Type alias for the Go representation of a JSON object
+
+---
+
+### func (*Obj) AddKV
+
+```go
+func (o *Obj) AddKV(key string, value interface{})
+```
+AddKV adds a key/value pair to the JSON object
+

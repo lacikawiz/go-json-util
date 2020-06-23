@@ -17,7 +17,7 @@ type RawObj = map[string]interface{}
 //RawArray Type alias for the Go representation of a JSON array
 type RawArray = []interface{}
 
-//Obj : the basic JSON wrapper object
+//Obj is the basic JSON wrapper object
 type Obj struct {
 	Data    interface{}
 	Err     error
@@ -34,7 +34,7 @@ var DBG struct {
 ██████ HELPER FUNCTIONS
 ████████████████████████████████████████████*/
 
-//recovery: Internal function to run the repeating code for handling cases when things would panic
+//recovery Internal function to run the repeating code for handling cases when things would panic
 func recovery(warn string, setter func(error)) {
 	if r := recover(); r != nil {
 		setter(r.(error))
@@ -81,7 +81,7 @@ func FromJSON(jsonInp string) (out Obj) {
 	return
 }
 
-//ToJSON GENERATES THE JSON STRING REPRESENTATION OF THE OBJECT
+//ToJSON generates the json string representation of the object
 func (o Obj) ToJSON() string {
 
 	out, err := json.Marshal(o.Data)
@@ -95,7 +95,7 @@ func (o Obj) ToJSON() string {
 ██████ WALK METHODS, to access nested, indexed content
 ████████████████████████████████████████████*/
 
-//K : walk one, or more steps deeper into the structure  K=key
+//K  walk one, or more steps deeper into the structure  K=key
 func (o Obj) K(keys ...string) (n Obj) {
 	defer recovery("JSON walk error", func(err error) {
 		n = Obj{Err: err}
@@ -114,7 +114,7 @@ func (o Obj) K(keys ...string) (n Obj) {
 	return n
 }
 
-//I : walk one, or more dimension down into an array
+//I = walk one, or more dimension down into an array (I = index)
 func (o Obj) I(index ...int) (n Obj) {
 	defer recovery("JSON walk error", func(err error) {
 		n = Obj{Err: err}
@@ -136,7 +136,7 @@ func (o Obj) I(index ...int) (n Obj) {
 ██████ CONVERSION METHODS
 ████████████████████████████████████████████*/
 
-//String : convert value to a string
+//String convert value to a string
 func (o Obj) String(toErr *error) (s string) {
 	setError(toErr, nil)
 	defer recovery("JSON to string conversion error:", func(err error) {
@@ -283,7 +283,7 @@ func (o Obj) ToStringArray(toErr *error) (out []string) {
 ██████ ITERATORS
 ████████████████████████████████████████████*/
 
-//ForEachArr ITERATE OVER AN ARRAY
+//ForEachArr iterate over an array, calling a function with the values
 func (o Obj) ForEachArr(F func(Obj, int)) (toErr error) {
 	defer recovery("ARRAY iteration error:", func(err error) {
 		toErr = err
@@ -302,7 +302,7 @@ func (o Obj) ForEachArr(F func(Obj, int)) (toErr error) {
 	return nil
 }
 
-//ForEachObj ITERATE OVER AN OBJECT
+//ForEachObj iterate over an object, calling a function with the values
 func (o Obj) ForEachObj(F func(Obj, string)) (toErr error) {
 	defer recovery("OBJECT iteration error:", func(err error) {
 		toErr = err
@@ -366,7 +366,7 @@ func (o Obj) RemoveKey(key string) (n Obj) {
 ██████ INFO METHODS
 ████████████████████████████████████████████*/
 
-// Len : The length (size of an array or object)
+// Len gives the length (size of an array or object)
 // if the object is no an array or object then result is -1
 func (o Obj) Len() int {
 	switch v := o.Data.(type) {
@@ -378,8 +378,8 @@ func (o Obj) Len() int {
 	return -1
 }
 
-//IsNil : checks if the raw data is a `nil`
+//IsNil checks if the raw data is a `nil`
 func (o Obj) IsNil() bool { return o.Data == nil }
 
-//Raw : this is for testing purposes only, returns the raw data object
+//Raw returns the raw Golang interface object for the JSON object
 func (o Obj) Raw() interface{} { return o.Data }
