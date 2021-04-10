@@ -11,7 +11,7 @@ I was very tired of all the boilerplating, and typecasting and runtime crashes w
 - Should not ever crash, even if keys don't exist, or type of data does not match
 - Should do type conversion automatically, if possible when accessing data 
 
-So, I build my solution based on these principle and have been using it in production for over a year, and it made my life quite a bit easier. So, I'm sharing it now for others who want simple reliable handling for JSON.
+So, I built my solution based on these principles and have been using it in production for over a year, and it made my life quite a bit easier. So, I'm sharing it now for others who want simple reliable handling for JSON.
 
 The module does not contain all JSON related operations. It only has what I needed on my projects but I think it covers probably 99% of cases.
 
